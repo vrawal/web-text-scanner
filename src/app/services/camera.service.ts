@@ -43,6 +43,8 @@ export class CameraService {
   mrzData = signal<MRZData | null>(null);
   mrzError = signal<string | null>(null);
 
+
+  // make this and stop cam method
   async startCamera(videoElement: HTMLVideoElement): Promise<void> {
     try {
       this.error.set(null);
