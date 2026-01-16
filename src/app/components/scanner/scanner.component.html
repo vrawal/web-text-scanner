@@ -1,0 +1,266 @@
+<div class="scanner-container">
+  <header class="scanner-header">
+    <h1>📷 ID & License Scanner</h1>
+    <p>Scan your identity cards and driver's licenses with your webcam</p>
+  </header>
+
+  <div class="scanner-content">
+    <!-- Camera Section -->
+    <div class="camera-section">
+      <div class="camera-wrapper" [class.active]="isStreaming()">
+        <video
+          #videoElement
+          [class.hidden]="!isStreaming()"
+          autoplay
+          playsinline
+          muted
+        ></video>
+
+        @if (!isStreaming()) {
+          <div class="camera-placeholder">
+            <div class="camera-icon">📹</div>
+            <p>Camera is off</p>
+            <button class="btn btn-primary" (click)="startCamera()">
+              Start Camera
+            </button>
+          </div>
+        }
+
+        @if (isStreaming() && showGuide) {
+          <div class="scan-guide">
+            <div class="guide-frame">
+              <span class="guide-corner top-left"></span>
+              <span class="guide-corner top-right"></span>
+              <span class="guide-corner bottom-left"></span>
+              <span class="guide-corner bottom-right"></span>
+            </div>
+            <p class="guide-text">Position your card within the frame</p>
+          </div>
+        }
+
+        @if (isCapturing) {
+          <div class="capture-flash"></div>
+        }
+      </div>
+
+      @if (error()) {
+        <div class="error-message">
+          <span class="error-icon">⚠️</span>
+          {{ error() }}
+        </div>
+      }
+
+      <!-- Controls -->
+      <div class="controls">
+        <div class="type-selector">
+          <label>Document Type:</label>
+          <select [(ngModel)]="selectedType">
+            <option value="license">Driver's License</option>
+            <option value="identity">Identity Card</option>
+            <option value="other">Other Document</option>
+          </select>
+        </div>
+
+        <div class="action-buttons">
+          @if (isStreaming()) {
+            <button class="btn btn-capture" (click)="captureImage()" [disabled]="isCapturing">
+              📸 Capture
+            </button>
+            <button class="btn btn-secondary" (click)="toggleGuide()">
+              {{ showGuide ? 'Hide' : 'Show' }} Guide
+            </button>
+            <button class="btn btn-danger" (click)="stopCamera()">
+              Stop Camera
+            </button>
+          } @else {
+            <button class="btn btn-primary" (click)="startCamera()">
+              Start Camera
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Scanned Data Section -->
+    <div class="text-section">
+      <div class="text-header">
+        <h2>🪪 Document Data</h2>
+        <div class="text-actions">
+          @if (isScanning()) {
+            <span class="scanning-indicator">
+              <span class="spinner"></span>
+              Scanning... {{ scanProgress() }}%
+            </span>
+          }
+          @if (mrzData() || scannedText()) {
+            <button class="btn btn-sm btn-secondary" (click)="toggleRawText()">
+              {{ showRawText ? '📋 Show Parsed' : '📄 Show Raw' }}
+            </button>
+            @if (mrzData()) {
+              <button class="btn btn-sm btn-secondary" (click)="copyMRZData()" title="Copy parsed data">
+                📋 Copy
+              </button>
+            }
+            <button class="btn btn-sm btn-danger" (click)="clearScannedText()">
+              Clear
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="text-content">
+        @if (mrzData() && !showRawText) {
+          <!-- Parsed MRZ Data Display -->
+          <div class="mrz-data-card">
+            <div class="mrz-header">
+              <span class="mrz-valid-badge" [class.valid]="mrzData()!.valid">
+                {{ mrzData()!.valid ? '✓ Valid' : '⚠ Check Required' }}
+              </span>
+              <span class="mrz-doc-type">{{ mrzData()!.documentType }}</span>
+            </div>
+
+            <div class="mrz-fields">
+              <div class="mrz-field">
+                <label>Full Name</label>
+                <span class="mrz-value name">{{ mrzData()!.firstName }} {{ mrzData()!.lastName }}</span>
+              </div>
+
+              <div class="mrz-field-row">
+                <div class="mrz-field">
+                  <label>Document Number</label>
+                  <span class="mrz-value">{{ mrzData()!.documentNumber || 'N/A' }}</span>
+                </div>
+                <div class="mrz-field">
+                  <label>Nationality</label>
+                  <span class="mrz-value">{{ mrzData()!.nationality || 'N/A' }}</span>
+                </div>
+              </div>
+
+              <div class="mrz-field-row">
+                <div class="mrz-field">
+                  <label>Date of Birth</label>
+                  <span class="mrz-value">{{ mrzData()!.birthDate || 'N/A' }}</span>
+                </div>
+                <div class="mrz-field">
+                  <label>Sex</label>
+                  <span class="mrz-value">{{ mrzData()!.sex === 'M' ? 'Male' : mrzData()!.sex === 'F' ? 'Female' : 'N/A' }}</span>
+                </div>
+              </div>
+
+              <div class="mrz-field-row">
+                <div class="mrz-field">
+                  <label>Expiration Date</label>
+                  <span class="mrz-value">{{ mrzData()!.expirationDate || 'N/A' }}</span>
+                </div>
+                <div class="mrz-field">
+                  <label>Issuing State</label>
+                  <span class="mrz-value">{{ mrzData()!.issuingState || 'N/A' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mrz-raw">
+              <label>MRZ Lines</label>
+              <code>
+                @for (line of mrzData()!.rawMRZ; track $index) {
+                  {{ line }}<br>
+                }
+              </code>
+            </div>
+          </div>
+        } @else if (scannedText() && showRawText) {
+          <textarea
+            class="scanned-text-area"
+            [value]="scannedText()"
+            readonly
+            placeholder="Scanned text will appear here..."
+          ></textarea>
+        } @else if (mrzError() && !mrzData()) {
+          <div class="mrz-error">
+            <span class="error-icon">ℹ️</span>
+            <p>{{ mrzError() }}</p>
+            @if (scannedText()) {
+              <button class="btn btn-sm btn-secondary" (click)="showRawText = true">
+                View Raw Text
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="no-text">
+            <span class="empty-icon">🪪</span>
+            @if (isScanning()) {
+              <p>Scanning document for MRZ data...</p>
+              <div class="progress-bar">
+                <div class="progress-fill" [style.width.%]="scanProgress()"></div>
+              </div>
+            } @else if (isStreaming()) {
+              <p>Position the MRZ zone in the camera view</p>
+              <p class="hint">The MRZ is the 2-3 lines of text with &lt;&lt;&lt; at the bottom of IDs/passports</p>
+              <button class="btn btn-primary btn-sm" (click)="scanNow()" [disabled]="isScanning()">
+                🔍 Scan Now
+              </button>
+            } @else {
+              <p>Start the camera to scan MRZ from documents</p>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <div class="captures-row">
+    <!-- Captured Images Section -->
+    <div class="captures-section">
+      <div class="captures-header">
+        <h2>Captured Documents ({{ capturedImages().length }})</h2>
+        @if (capturedImages().length > 0) {
+          <button class="btn btn-sm btn-danger" (click)="clearAllImages()">
+            Clear All
+          </button>
+        }
+      </div>
+
+      @if (capturedImages().length === 0) {
+        <div class="no-captures">
+          <span class="empty-icon">🖼️</span>
+          <p>No documents captured yet</p>
+          <p class="hint">Start the camera and capture your first document</p>
+        </div>
+      } @else {
+        <div class="captures-grid">
+          @for (image of capturedImages(); track image.id) {
+            <div class="capture-card">
+              <div class="capture-image">
+                <img [src]="image.dataUrl" [alt]="image.type + ' scan'" />
+                <span class="capture-type" [attr.data-type]="image.type">
+                  {{ image.type === 'license' ? '🚗' : image.type === 'identity' ? '🪪' : '📄' }}
+                  {{ image.type | titlecase }}
+                </span>
+              </div>
+              <div class="capture-info">
+                <span class="capture-time">
+                  {{ image.timestamp | date:'short' }}
+                </span>
+                <div class="capture-actions">
+                  <button class="btn-icon" (click)="scanCapturedImage(image)" title="Scan text from this image">
+                    🔍
+                  </button>
+                  <button class="btn-icon" (click)="downloadImage(image)" title="Download">
+                    ⬇️
+                  </button>
+                  <button class="btn-icon btn-icon-danger" (click)="removeImage(image)" title="Delete">
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  <footer class="scanner-footer">
+    <p>🔒 All scans are processed locally. No data is sent to external servers.</p>
+  </footer>
+</div>
